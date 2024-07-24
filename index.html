@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kế Hoạch Gia Đình</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="alert alert-danger" id="error" style="display: none"></div>
+      <div class="row">
+        <div class="col-md-4">
+          <h1>Kế Hoạch Gia Đình</h1>
+          <h3>Còn Lại: <span id="total">0</span> ￥</h3>
+          <form id="receipt-form">
+            <div class="mb-3">
+              <label for="date" class="form-label">Ngày:</label>
+              <input
+                type="date"
+                id="date"
+                value=""
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <label for="value" class="form-label">Số:</label>
+                <input type="number" id="value" class="form-control" required />
+              </div>
+              <div class="col">
+                <label for="action" class="form-label">Hành động:</label>
+                <select id="action" class="form-select" required>
+                  <option value="received">Thêm Vào Quỹ</option>
+                  <option value="paid">Mua</option>
+                </select>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <label for="description" class="form-label">Ghi chú:</label>
+                <input type="text" id="description" class="form-control" />
+              </div>
+              <div class="col">
+                <label for="spinner" class="form-label">Nơi Mua:</label>
+                <select id="spinner" class="form-select">
+                  <option value="Hanamasa">Hanamasa</option>
+                  <option value="Gyomu">Gyomu</option>
+                  <option value="Aeon">Aeon</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <button type="submit" class="btn btn-primary w-100">
+                  Ghi vào
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="col-md-8">
+          <h2>Lịch Sử:</h2>
+          <ul class="list-group" id="receipt-list">
+            <!-- Receipts will be added here -->
+          </ul>
+        </div>
+      </div>
+    </div>
+    <script>
+      function formatDate(dateString) {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Tháng từ 0 đến 11
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+      formatDate();
+      document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('receipt-form');
+        const errorDiv = document.getElementById('error');
+        const totalSpan = document.getElementById('total');
+        const receiptList = document.getElementById('receipt-list');
+        let total = 0;
+
+        // Fetch existing receipts and total
+        axios
+          .get('https://kitaueno.onrender.com/api/bill/receipt')
+          .then((response) => {
+            response.data.forEach((receipt) => {
+              addReceiptToList(receipt);
+              total +=
+                receipt.action === 'received' ? receipt.value : -receipt.value;
+            });
+            totalSpan.textContent = total;
+          })
+          .catch((error) => {
+            errorDiv.textContent = 'Error fetching receipts';
+            errorDiv.style.display = 'block';
+            console.error('Error fetching receipts:', error);
+          });
+
+        axios
+          .get('https://kitaueno.onrender.com/api/bill/total')
+          .then((response) => {
+            total = response.data.total;
+            totalSpan.textContent = total;
+          })
+          .catch((error) => {
+            errorDiv.textContent = 'Error fetching total';
+            errorDiv.style.display = 'block';
+            console.error('Error fetching total:', error);
+          });
+
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+
+          const date = document.getElementById('date').value;
+          const value = parseInt(document.getElementById('value').value, 10);
+          const action = document.getElementById('action').value;
+          const description = document.getElementById('description').value;
+          const spinnerValue = document.getElementById('spinner').value;
+
+          const fullDescription = `${description} - ${spinnerValue}`;
+
+          axios
+            .post('https://kitaueno.onrender.com/add-receipt', {
+              value,
+              action,
+              description: fullDescription,
+              date,
+            })
+            .then((response) => {
+              addReceiptToList(response.data);
+
+              total += action === 'received' ? value : -value;
+              totalSpan.textContent = total;
+
+              form.reset();
+            })
+            .catch((error) => {
+              errorDiv.textContent = 'Error adding receipt';
+              errorDiv.style.display = 'block';
+              console.error('Error adding receipt:', error);
+            });
+        });
+
+        function addReceiptToList(receipt) {
+          const listItem = document.createElement('li');
+          listItem.className = `list-group-item ${
+            receipt.action === 'received'
+              ? 'list-group-item-success'
+              : 'list-group-item-warning'
+          }`;
+          listItem.innerHTML = `
+            <div>
+                <strong>Ngày:</strong> ${moment(receipt.date).format(
+                  'DD/MM/YYYY'
+                )} <br />
+                <strong>Tổng:</strong> ${receipt.value} ￥<br />
+                ${receipt.action === 'received' ? 'Thêm Vào Quỹ' : 'Mua'} <br />
+                <strong>Ghi chú:</strong> ${receipt.description}
+            </div>
+        `;
+          receiptList.prepend(listItem);
+        }
+      });
+    </script>
+  </body>
+</html>
