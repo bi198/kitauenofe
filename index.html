@@ -26,6 +26,7 @@
                 type="date"
                 id="date"
                 value=""
+                defaultValue="{toDay}"
                 class="form-control"
                 required
               />
@@ -38,8 +39,8 @@
               <div class="col">
                 <label for="action" class="form-label">Hành động:</label>
                 <select id="action" class="form-select" required>
-                  <option value="received">Thêm Vào Quỹ</option>
                   <option value="paid">Mua</option>
+                  <option value="received">Thêm Vào Quỹ</option>
                 </select>
               </div>
             </div>
@@ -76,52 +77,47 @@
       </div>
     </div>
     <script>
-      function formatDate(dateString) {
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0'); // Tháng từ 0 đến 11
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-      }
-      formatDate();
-      document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', async () => {
         const form = document.getElementById('receipt-form');
         const errorDiv = document.getElementById('error');
         const totalSpan = document.getElementById('total');
         const receiptList = document.getElementById('receipt-list');
         let total = 0;
 
-        // Fetch existing receipts and total
-        axios
-          .get('https://kitaueno.onrender.com/api/bill/receipt')
-          .then((response) => {
+        async function fetchReceipts() {
+          try {
+            const response = await axios.get(
+              'https://kitaueno.onrender.com/api/bill/receipt'
+            );
             response.data.forEach((receipt) => {
               addReceiptToList(receipt);
               total +=
                 receipt.action === 'received' ? receipt.value : -receipt.value;
             });
             totalSpan.textContent = total;
-          })
-          .catch((error) => {
+          } catch (error) {
             errorDiv.textContent = 'Error fetching receipts';
             errorDiv.style.display = 'block';
             console.error('Error fetching receipts:', error);
-          });
+          }
+        }
 
-        axios
-          .get('https://kitaueno.onrender.com/api/bill/total')
-          .then((response) => {
+        async function fetchTotal() {
+          try {
+            const response = await axios.get(
+              'https://kitaueno.onrender.com/api/bill/total'
+            );
             total = response.data.total;
             totalSpan.textContent = total;
-          })
-          .catch((error) => {
+          } catch (error) {
             errorDiv.textContent = 'Error fetching total';
             errorDiv.style.display = 'block';
             console.error('Error fetching total:', error);
-          });
+          }
+        }
 
-        form.addEventListener('submit', (e) => {
-          e.preventDefault();
+        async function handleSubmit(event) {
+          event.preventDefault();
 
           const date = document.getElementById('date').value;
           const value = parseInt(document.getElementById('value').value, 10);
@@ -131,27 +127,28 @@
 
           const fullDescription = `${description} - ${spinnerValue}`;
 
-          axios
-            .post('https://kitaueno.onrender.com/add-receipt', {
-              value,
-              action,
-              description: fullDescription,
-              date,
-            })
-            .then((response) => {
-              addReceiptToList(response.data);
+          try {
+            const response = await axios.post(
+              'https://kitaueno.onrender.com/add-receipt',
+              {
+                value,
+                action,
+                description: fullDescription,
+                date,
+              }
+            );
+            addReceiptToList(response.data);
 
-              total += action === 'received' ? value : -value;
-              totalSpan.textContent = total;
+            total += action === 'received' ? value : -value;
+            totalSpan.textContent = total;
 
-              form.reset();
-            })
-            .catch((error) => {
-              errorDiv.textContent = 'Error adding receipt';
-              errorDiv.style.display = 'block';
-              console.error('Error adding receipt:', error);
-            });
-        });
+            form.reset();
+          } catch (error) {
+            errorDiv.textContent = 'Error adding receipt';
+            errorDiv.style.display = 'block';
+            console.error('Error adding receipt:', error);
+          }
+        }
 
         function addReceiptToList(receipt) {
           const listItem = document.createElement('li');
@@ -162,16 +159,21 @@
           }`;
           listItem.innerHTML = `
             <div>
-                <strong>Ngày:</strong> ${moment(receipt.date).format(
-                  'DD/MM/YYYY'
-                )} <br />
-                <strong>Tổng:</strong> ${receipt.value} ￥<br />
-                ${receipt.action === 'received' ? 'Thêm Vào Quỹ' : 'Mua'} <br />
-                <strong>Ghi chú:</strong> ${receipt.description}
+              <strong>Ngày:</strong> ${moment(receipt.date).format(
+                'DD/MM/YYYY'
+              )} <br />
+              <strong>Tổng:</strong> ${receipt.value} ￥<br />
+              ${receipt.action === 'received' ? 'Thêm Vào Quỹ' : 'Mua'} <br />
+              <strong>Ghi chú:</strong> ${receipt.description}
             </div>
-        `;
+          `;
           receiptList.prepend(listItem);
         }
+
+        await fetchReceipts();
+        await fetchTotal();
+
+        form.addEventListener('submit', handleSubmit);
       });
     </script>
   </body>
