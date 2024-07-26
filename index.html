@@ -22,14 +22,7 @@
           <form id="receipt-form">
             <div class="mb-3">
               <label for="date" class="form-label">Ngày:</label>
-              <input
-                type="date"
-                id="date"
-                value=""
-                defaultValue="{toDay}"
-                class="form-control"
-                required
-              />
+              <input type="date" id="date" class="form-control" required />
             </div>
             <div class="row mb-3">
               <div class="col">
@@ -70,6 +63,7 @@
         </div>
         <div class="col-md-8">
           <h2>Lịch Sử:</h2>
+
           <ul class="list-group" id="receipt-list">
             <!-- Receipts will be added here -->
           </ul>
@@ -77,6 +71,37 @@
       </div>
     </div>
     <script>
+      window.confirmDelete = async function (receiptId, button) {
+        if (confirm('Bạn có chắc chắn muốn xóa mục này không?')) {
+          try {
+            const response = await axios.put(
+              `https://kitaueno.onrender.com/api/bill/receipt/deactivate/${receiptId}`
+            );
+            if (response.data.status === 'deactive') {
+              const listItem = button.closest('li');
+              const value = parseInt(
+                listItem
+                  .querySelector('strong:nth-child(2)')
+                  .textContent.split(' ')[1],
+                10
+              );
+              const action = listItem.innerHTML.includes('Thêm Vào Quỹ')
+                ? 'received'
+                : 'paid';
+              total += action === 'received' ? -value : value;
+              totalSpan.textContent = total;
+
+              listItem.remove();
+
+              window.location.reload();
+            }
+          } catch (error) {
+            errorDiv.textContent = 'Error deactivating receipt';
+            errorDiv.style.display = 'block';
+            console.error('Error deactivating receipt:', error);
+          }
+        }
+      };
       document.addEventListener('DOMContentLoaded', async () => {
         const form = document.getElementById('receipt-form');
         const errorDiv = document.getElementById('error');
@@ -84,11 +109,15 @@
         const receiptList = document.getElementById('receipt-list');
         let total = 0;
 
+        // Set default date to today
+        document.getElementById('date').value = moment().format('YYYY-MM-DD');
+
         async function fetchReceipts() {
           try {
             const response = await axios.get(
-              'https://kitaueno.onrender.com/api/bill/receipt'
+              'https://kitaueno.onrender.com/api/bill/receipt?status=active'
             );
+            receiptList.innerHTML = ''; // Clear the list before adding items
             response.data.forEach((receipt) => {
               addReceiptToList(receipt);
               total +=
@@ -99,20 +128,6 @@
             errorDiv.textContent = 'Error fetching receipts';
             errorDiv.style.display = 'block';
             console.error('Error fetching receipts:', error);
-          }
-        }
-
-        async function fetchTotal() {
-          try {
-            const response = await axios.get(
-              'https://kitaueno.onrender.com/api/bill/total'
-            );
-            total = response.data.total;
-            totalSpan.textContent = total;
-          } catch (error) {
-            errorDiv.textContent = 'Error fetching total';
-            errorDiv.style.display = 'block';
-            console.error('Error fetching total:', error);
           }
         }
 
@@ -141,6 +156,7 @@
 
             total += action === 'received' ? value : -value;
             totalSpan.textContent = total;
+
             form.reset();
           } catch (error) {
             errorDiv.textContent = 'Error adding receipt';
@@ -151,51 +167,30 @@
 
         function addReceiptToList(receipt) {
           const listItem = document.createElement('li');
-          listItem.className =
-            'list-group-item d-flex justify-content-between align-items-center';
-          listItem.textContent = `${moment(receipt.date).format(
-            'DD/MM/YYYY'
-          )} - ${receipt.action === 'received' ? 'Thêm' : 'Mua'}: ${
-            receipt.value
-          } ￥ - ${receipt.description}`;
-
-          const deactivateButton = document.createElement('button');
-          deactivateButton.className = 'btn btn-danger btn-sm ms-2';
-          deactivateButton.textContent = 'Xóa';
-          deactivateButton.onclick = () => deactivateReceipt(receipt._id);
-
-          listItem.appendChild(deactivateButton);
-          receiptList.appendChild(listItem);
-        }
-
-        async function deactivateReceipt(receiptId) {
-          try {
-            const response = await axios.put(
-              `https://kitaueno.onrender.com/api/bill/receipt/deactivate/${receiptId}`
-            );
-            if (response.data.status === 'deactive') {
-              const receiptItem = document.querySelector(
-                `li[data-id="${receiptId}"]`
-              );
-              const value = parseInt(receiptItem.textContent.split(' ')[2], 10);
-              const action = receiptItem.textContent.includes('Thêm')
-                ? 'received'
-                : 'paid';
-              total -= action === 'received' ? value : -value;
-              totalSpan.textContent = total;
-
-              receiptItem.remove();
-            }
-          } catch (error) {
-            errorDiv.textContent = 'Error deactivating receipt';
-            errorDiv.style.display = 'block';
-            console.error('Error deactivating receipt:', error);
-          }
+          listItem.className = `list-group-item ${
+            receipt.action === 'received'
+              ? 'list-group-item-success'
+              : 'list-group-item-warning'
+          } d-flex justify-content-between align-items-center`;
+          listItem.dataset.id = receipt._id;
+          listItem.innerHTML = `
+          <div>
+            <strong>Ngày:</strong> ${moment(receipt.date).format(
+              'DD/MM/YYYY'
+            )} <br />
+            <strong>Tổng:</strong> ${receipt.value} ￥<br />
+            ${receipt.action === 'received' ? 'Thêm Vào Quỹ' : 'Mua'} <br />
+            <strong>Ghi chú:</strong> ${receipt.description}
+          </div>
+          <button class="btn btn-danger btn-sm ms-2" onclick="confirmDelete('${
+            receipt._id
+          }', this)">Xóa</button>
+        `;
+          receiptList.prepend(listItem);
         }
 
         form.addEventListener('submit', handleSubmit);
         await fetchReceipts();
-        await fetchTotal();
       });
     </script>
   </body>
