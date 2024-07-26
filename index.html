@@ -141,7 +141,6 @@
 
             total += action === 'received' ? value : -value;
             totalSpan.textContent = total;
-
             form.reset();
           } catch (error) {
             errorDiv.textContent = 'Error adding receipt';
@@ -152,28 +151,51 @@
 
         function addReceiptToList(receipt) {
           const listItem = document.createElement('li');
-          listItem.className = `list-group-item ${
-            receipt.action === 'received'
-              ? 'list-group-item-success'
-              : 'list-group-item-warning'
-          }`;
-          listItem.innerHTML = `
-            <div>
-              <strong>Ngày:</strong> ${moment(receipt.date).format(
-                'DD/MM/YYYY'
-              )} <br />
-              <strong>Tổng:</strong> ${receipt.value} ￥<br />
-              ${receipt.action === 'received' ? 'Thêm Vào Quỹ' : 'Mua'} <br />
-              <strong>Ghi chú:</strong> ${receipt.description}
-            </div>
-          `;
-          receiptList.prepend(listItem);
+          listItem.className =
+            'list-group-item d-flex justify-content-between align-items-center';
+          listItem.textContent = `${moment(receipt.date).format(
+            'DD/MM/YYYY'
+          )} - ${receipt.action === 'received' ? 'Thêm' : 'Mua'}: ${
+            receipt.value
+          } ￥ - ${receipt.description}`;
+
+          const deactivateButton = document.createElement('button');
+          deactivateButton.className = 'btn btn-danger btn-sm ms-2';
+          deactivateButton.textContent = 'Xóa';
+          deactivateButton.onclick = () => deactivateReceipt(receipt._id);
+
+          listItem.appendChild(deactivateButton);
+          receiptList.appendChild(listItem);
         }
 
-        await fetchReceipts();
-        await fetchTotal();
+        async function deactivateReceipt(receiptId) {
+          try {
+            const response = await axios.put(
+              `https://kitaueno.onrender.com/api/bill/receipt/deactivate/${receiptId}`
+            );
+            if (response.data.status === 'deactive') {
+              const receiptItem = document.querySelector(
+                `li[data-id="${receiptId}"]`
+              );
+              const value = parseInt(receiptItem.textContent.split(' ')[2], 10);
+              const action = receiptItem.textContent.includes('Thêm')
+                ? 'received'
+                : 'paid';
+              total -= action === 'received' ? value : -value;
+              totalSpan.textContent = total;
+
+              receiptItem.remove();
+            }
+          } catch (error) {
+            errorDiv.textContent = 'Error deactivating receipt';
+            errorDiv.style.display = 'block';
+            console.error('Error deactivating receipt:', error);
+          }
+        }
 
         form.addEventListener('submit', handleSubmit);
+        await fetchReceipts();
+        await fetchTotal();
       });
     </script>
   </body>
