@@ -92,15 +92,15 @@
               totalSpan.textContent = total;
 
               listItem.remove();
-
-              window.location.reload();
             }
+            location.reload();
           } catch (error) {
             errorDiv.textContent = 'Error deactivating receipt';
             errorDiv.style.display = 'block';
             console.error('Error deactivating receipt:', error);
           }
         }
+        fetchReceipts();
       };
       document.addEventListener('DOMContentLoaded', async () => {
         const form = document.getElementById('receipt-form');
@@ -180,7 +180,8 @@
             )} <br />
             <strong>Tổng:</strong> ${receipt.value} ￥<br />
             ${receipt.action === 'received' ? 'Thêm Vào Quỹ' : 'Mua'} <br />
-            <strong>Ghi chú:</strong> ${receipt.description}
+            <strong>Ghi chú:</strong> ${receipt.description}<br />
+            <strong>Cập nhật lần cuối:</strong> ${receipt.modifiedDate}
           </div>
           <button class="btn btn-danger btn-sm ms-2" onclick="confirmDelete('${
             receipt._id
