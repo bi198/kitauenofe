@@ -1,33 +1,42 @@
+const form = document.getElementById('receipt-form');
+const errorDiv = document.getElementById('error');
+const totalSpan = document.getElementById('total');
+const receiptList = document.getElementById('receipt-list');
+let total = 0;
+async function fetchReceipts() {
+  try {
+    const response = await axios.get(
+      'https://kitaueno.onrender.com/api/bill/receipt?status=active'
+    );
+    receiptList.innerHTML = '-'; // Clear the list before adding items
+    response.data.forEach((receipt) => {
+      addReceiptToList(receipt);
+      total += receipt.action === 'received' ? receipt.value : -receipt.value;
+    });
+    totalSpan.textContent = total;
+    console.log('AAAAAAAA');
+  } catch (error) {
+    errorDiv.textContent = 'Error fetching receipts';
+    errorDiv.style.display = 'block';
+    console.error('Error fetching receipts:', error);
+  }
+}
 window.confirmDelete = async function (receiptId, button) {
+  const errorDiv = document.getElementById('error');
   if (confirm('Bạn có chắc chắn muốn xóa mục này không?')) {
     try {
       const response = await axios.put(
         `https://kitaueno.onrender.com/api/bill/receipt/deactivate/${receiptId}`
       );
-      if (response.data.status === 'deactive') {
-        const listItem = button.closest('li');
-        const value = parseInt(
-          listItem
-            .querySelector('strong:nth-child(2)')
-            .textContent.split(' ')[1],
-          10
-        );
-        const action = listItem.innerHTML.includes('Thêm Vào Quỹ')
-          ? 'received'
-          : 'paid';
-        total += action === 'received' ? -value : value;
-        totalSpan.textContent = total;
-
-        listItem.remove();
-      }
       location.reload();
+      //await fetchReceipts();
     } catch (error) {
+      console.log(error);
       errorDiv.textContent = 'Error deactivating receipt';
       errorDiv.style.display = 'block';
       console.error('Error deactivating receipt:', error);
     }
   }
-  fetchReceipts();
 };
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('receipt-form');
@@ -35,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const totalSpan = document.getElementById('total');
   const receiptList = document.getElementById('receipt-list');
   let total = 0;
-
   // Set default date to today
   document.getElementById('date').value = moment().format('YYYY-MM-DD');
 
@@ -43,6 +51,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const response = await axios.get(
         'https://kitaueno.onrender.com/api/bill/receipt?status=active'
+      );
+      receiptList.innerHTML = '-'; // Clear the list before adding items
+      response.data.forEach((receipt) => {
+        addReceiptToList(receipt);
+        total += receipt.action === 'received' ? receipt.value : -receipt.value;
+      });
+      totalSpan.textContent = total;
+      console.log('AAAAAAAA');
+    } catch (error) {
+      errorDiv.textContent = 'Error fetching receipts';
+      errorDiv.style.display = 'block';
+      console.error('Error fetching receipts:', error);
+    }
+  }
+
+  async function fetchHistoryReceipts() {
+    try {
+      const response = await axios.get(
+        'https://kitaueno.onrender.com/api/bill/deleted_receipts'
       );
       receiptList.innerHTML = ''; // Clear the list before adding items
       response.data.forEach((receipt) => {
@@ -85,6 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       form.reset();
     } catch (error) {
+      console.log(error);
       errorDiv.textContent = 'Error adding receipt';
       errorDiv.style.display = 'block';
       console.error('Error adding receipt:', error);
@@ -121,12 +149,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   form.addEventListener('submit', handleSubmit);
   await fetchReceipts();
 });
-/* document.addEventListener('DOMContentLoaded', () => {
-    const toggleAsideButton = document.getElementById('toggle-aside');
-    const aside = document.getElementById('aside');
-  
-    toggleAsideButton.addEventListener('click', () => {
-      aside.classList.toggle('minimized');
-    });
-  });
-*/
